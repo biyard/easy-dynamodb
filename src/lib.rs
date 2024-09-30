@@ -16,11 +16,12 @@ pub struct Client {
     table_name: String,
     log: Logger,
     key_field: String,
+    #[allow(dead_code)]
     sort_key_field: Option<String>,
 }
 
 impl Client {
-    pub async fn new(
+    pub fn new(
         logger: Logger,
         access_key_id: String,
         secret_access_key: String,
@@ -426,7 +427,7 @@ mod dyanomdb_tests {
         B(bool),
     }
 
-    async fn new_cli() -> Client {
+    fn new_cli() -> Client {
         Client::new(
             slog::Logger::root(slog::Discard, o!("goal" => "testing")),
             option_env!("AWS_ACCESS_KEY_ID")
@@ -445,12 +446,11 @@ mod dyanomdb_tests {
             None,
             None,
         )
-        .await
     }
 
     #[tokio::test]
     async fn test_create() {
-        let client = new_cli().await;
+        let client = new_cli();
         let ts = chrono::Utc::now().timestamp_nanos_opt();
         assert!(ts.is_some(), "timestamp is none");
         let ts = ts.unwrap();
@@ -468,7 +468,7 @@ mod dyanomdb_tests {
 
     #[tokio::test]
     async fn test_create_duplicated_error() {
-        let client = new_cli().await;
+        let client = new_cli();
         let ts = chrono::Utc::now().timestamp_nanos_opt();
         assert!(ts.is_some(), "timestamp is none");
         let ts = ts.unwrap();
@@ -499,7 +499,7 @@ mod dyanomdb_tests {
 
     #[tokio::test]
     async fn test_get() {
-        let client = new_cli().await;
+        let client = new_cli();
         let ts = chrono::Utc::now().timestamp_nanos_opt();
         assert!(ts.is_some(), "timestamp is none");
         let ts = ts.unwrap();
@@ -529,7 +529,7 @@ mod dyanomdb_tests {
 
     #[tokio::test]
     async fn test_update() {
-        let client = new_cli().await;
+        let client = new_cli();
         let ts = chrono::Utc::now().timestamp_nanos_opt();
         assert!(ts.is_some(), "timestamp is none");
         let ts = ts.unwrap();
@@ -582,7 +582,7 @@ mod dyanomdb_tests {
 
     #[tokio::test]
     async fn test_find() {
-        let client = new_cli().await;
+        let client = new_cli();
 
         // NOTE: below code is commented out because it's not necessary for the test
         //       It is just for insertion at the first time.
@@ -649,7 +649,7 @@ mod dyanomdb_tests {
 
     #[tokio::test]
     async fn test_delete() {
-        let client = new_cli().await;
+        let client = new_cli();
         let ts = chrono::Utc::now().timestamp_nanos_opt();
         assert!(ts.is_some(), "timestamp is none");
         let ts = ts.unwrap();

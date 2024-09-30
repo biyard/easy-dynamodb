@@ -1,10 +1,11 @@
 [package]
 name = "easy-dynamodb"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "A easy and simple library for interaction with DynamoDB"
 license = "MIT"
 keywords = ["dynamodb", "easy", "simple", "serverless"]
+repository = "https://github.com/biyard/easy-dynamodb"
 
 [dependencies]
 serde = { version = "1.0.198", features = ["derive"] }
