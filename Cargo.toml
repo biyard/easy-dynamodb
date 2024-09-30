@@ -1,0 +1,20 @@
+[package]
+name = "easy-dynamodb"
+version = "0.1.0"
+edition = "2021"
+description = "A easy and simple library for interaction with DynamoDB"
+license = "MIT"
+keywords = ["dynamodb", "easy", "simple", "serverless"]
+
+[dependencies]
+serde = { version = "1.0.198", features = ["derive"] }
+serde_json = { version = "1.0.116" }
+serde_dynamo = { version = "4.2.14", features = ["aws-sdk-dynamodb+1"] }
+aws-config = { version = "1.5.4" }
+aws-credential-types = { version = "1.2.0", features = ["hardcoded-credentials"] }
+aws-sdk-dynamodb = { version = "1.39.0", features = ["behavior-version-latest"] }
+slog = "2.7.0"
+
+[dev-dependencies]
+tokio = { version = "1.37.0", features = ["test-util", "full"] }
+chrono = "0.4.38"
