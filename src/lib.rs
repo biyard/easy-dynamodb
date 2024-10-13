@@ -76,7 +76,7 @@ impl Client {
         self.log.new(o!("method" => method))
     }
 
-    pub async fn create<T>(&self, doc: T) -> Result<(), DynamoException>
+    pub async fn upsert<T>(&self, doc: T) -> Result<(), DynamoException>
     where
         T: Debug + serde::Serialize,
     {
@@ -90,19 +90,50 @@ impl Client {
             Ok(item) => item,
             Err(e) => return Err(DynamoException::DynamoSerializeException(format!("{e:?}"))),
         };
-        let condition = format!("attribute_not_exists({})", self.key_field);
 
         match self
             .client
             .put_item()
             .table_name(&self.table_name)
             .set_item(Some(item))
-            .condition_expression(&condition)
             .send()
             .await
         {
             Ok(_) => Ok(()),
             Err(e) => Err(DynamoException::DynamoPutItemException(format!("{e:?}"))),
+        }
+    }
+
+    pub async fn create<T>(&self, doc: T) -> Result<(), DynamoException>
+    where
+        T: Debug + serde::Serialize,
+    {
+        let log = self.get_log("create");
+        debug!(log, "{:?}", doc);
+        let value = match serde_json::to_value(doc) {
+            Ok(value) => value,
+            Err(e) => return Err(DynamoException::DynamoSerializeException(format!("{e:?}"))),
+        };
+        let item: std::collections::HashMap<::std::string::String, AttributeValue> =
+            match serde_dynamo::to_item(value) {
+                Ok(item) => item,
+                Err(e) => return Err(DynamoException::DynamoSerializeException(format!("{e:?}"))),
+            };
+        let condition = format!("attribute_not_exists({})", self.key_field);
+
+        match self
+            .client
+            .put_item()
+            .table_name(&self.table_name)
+            .set_item(Some(item.clone()))
+            .condition_expression(&condition)
+            .send()
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(e) => Err(DynamoException::DynamoPutItemException(format!(
+                "{e:?}, {item:?}"
+            ))),
         }
     }
 
