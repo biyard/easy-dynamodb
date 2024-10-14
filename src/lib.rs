@@ -39,8 +39,10 @@ pub fn init(
     }
 }
 
-pub fn get_client() -> Client {
-    unsafe { CLI.clone().unwrap() }
+pub fn get_client(logger: Logger) -> Client {
+    let mut cli = unsafe { CLI.clone().unwrap() };
+    cli.log = logger.new(o!("crate" => "easy-dynamodb"));
+    cli
 }
 
 #[derive(Clone, Debug)]
