@@ -11,6 +11,39 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::Duration;
 
+static mut CLI: Option<Client> = None;
+
+pub fn init(
+    logger: Logger,
+    access_key_id: String,
+    secret_access_key: String,
+    region: String,
+    table_name: String,
+    key_field: String,
+
+    // TODO: not implement sort key yet
+    sort_key_field: Option<String>,
+    endpoint: Option<String>,
+) {
+    unsafe {
+        CLI = Some(Client::new(
+            logger,
+            access_key_id,
+            secret_access_key,
+            region,
+            table_name,
+            key_field,
+            sort_key_field,
+            endpoint,
+        ));
+    }
+}
+
+pub fn get_client() -> Client {
+    unsafe { CLI.clone().unwrap() }
+}
+
+#[derive(Clone, Debug)]
 pub struct Client {
     client: aws_sdk_dynamodb::Client,
     table_name: String,
