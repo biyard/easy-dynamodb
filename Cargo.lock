@@ -515,7 +515,7 @@ dependencies = [
 
 [[package]]
 name = "easy-dynamodb"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "aws-config",
  "aws-credential-types",
