@@ -361,7 +361,7 @@ impl Client {
 
     pub async fn increment(
         &self,
-        (key_field, key): (&str, &str),
+        key: &str,
         field: &str,
         value: i64,
     ) -> Result<(), DynamoException> {
@@ -373,7 +373,7 @@ impl Client {
 
         let mut names = HashMap::new();
         names.insert("#cnt".to_string(), field.into());
-        names.insert("#key".to_string(), key_field.into());
+        names.insert("#key".to_string(), self.key_field.clone().into());
 
         let mut values = HashMap::new();
         values.insert(":val".to_string(), AttributeValue::N(value.to_string()));
@@ -382,7 +382,7 @@ impl Client {
             .client
             .update_item()
             .table_name(&self.table_name)
-            .key(key_field, AttributeValue::S(key.to_string()))
+            .key(self.key_field.clone(), AttributeValue::S(key.to_string()))
             .update_expression(&update_expression)
             .condition_expression(condition_expression)
             .set_expression_attribute_names(Some(names))
@@ -698,7 +698,7 @@ mod dyanomdb_tests {
                     key: format!("{key_prefix}_key-{ts}_{i}"),
                     id: format!("{key_prefix}_id-{ts}_{i}"),
                     created_at: ts,
-                    r#type: "type1".to_string(),
+                    r#type: format!("type-{ts}-1").to_string(),
                 })
                 .await;
 
@@ -711,7 +711,7 @@ mod dyanomdb_tests {
                     key: format!("{key_prefix}_key-{ts}_{i}_2"),
                     id: format!("{key_prefix}_id-{ts}_{i}_2"),
                     created_at: ts,
-                    r#type: "type2".to_string(),
+                    r#type: format!("type-{ts}-2").to_string(),
                 })
                 .await;
 
@@ -721,7 +721,12 @@ mod dyanomdb_tests {
         thread::sleep(std::time::Duration::from_millis(100));
 
         let result = client
-            .find("type-index", None, Some(6), vec![("type", "type1")])
+            .find(
+                "type-index",
+                None,
+                Some(6),
+                vec![("type", format!("type-{ts}-1"))],
+            )
             .await;
 
         assert!(matches!(result, Ok((Some(_), Some(_)))), "{result:?}");
@@ -736,7 +741,7 @@ mod dyanomdb_tests {
                 "type-index",
                 Some(bookmark),
                 Some(6),
-                vec![("type", "type1")],
+                vec![("type", format!("type-{ts}-1"))],
             )
             .await;
 
@@ -796,14 +801,7 @@ mod dyanomdb_tests {
         assert!(result.is_ok(), "test_increment creation failed: {result:?}");
         thread::sleep(std::time::Duration::from_millis(100));
         let result = client
-            .increment(
-                (
-                    option_env!("AWS_DYNAMODB_KEY").unwrap_or("key"),
-                    &format!("test_increment_id-{ts}"),
-                ),
-                "created_at",
-                1,
-            )
+            .increment(&format!("test_increment_id-{ts}"), "created_at", 1)
             .await;
         assert!(result.is_ok(), "test_increment addition failed: {result:?}");
 
