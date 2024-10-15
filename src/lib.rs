@@ -179,14 +179,15 @@ impl Client {
         let log = self.get_log("update");
         debug!(log, "{:?} {:?}", key, fields);
 
-        let (names, values, condition) = self.to_attribute_names_and_values(fields)?;
+        let (mut names, values, condition) = self.to_attribute_names_and_values(fields)?;
 
         let update_expression = format!("SET {}", &condition.join(", "));
 
         let key_field = self.key_field.clone();
         let key_value = AttributeValue::S(key.to_string());
 
-        let condition_expression = format!("attribute_exists({})", key_field);
+        let condition_expression = format!("attribute_exists(#key)");
+        names.insert("#key".to_string(), key_field.clone().into());
 
         debug!(log, "update_expression({:?}), key_field({:?}), key_value({:?}), condition_expression({:?}) names({names:?}), values({values:?})", update_expression, key_field, key_value, condition_expression);
 
@@ -356,6 +357,42 @@ impl Client {
 
         let bookmark = self.encode_bookmark(resp.last_evaluated_key);
         Ok((docs, bookmark))
+    }
+
+    pub async fn increment(
+        &self,
+        (key_field, key): (&str, &str),
+        field: &str,
+        value: i64,
+    ) -> Result<(), DynamoException> {
+        let log = self.get_log("increment");
+        debug!(log, "{:?} {:?} {:?}", key, field, value);
+
+        let update_expression = format!("ADD #cnt :val");
+        let condition_expression = format!("attribute_exists(#key)");
+
+        let mut names = HashMap::new();
+        names.insert("#cnt".to_string(), field.into());
+        names.insert("#key".to_string(), key_field.into());
+
+        let mut values = HashMap::new();
+        values.insert(":val".to_string(), AttributeValue::N(value.to_string()));
+
+        match self
+            .client
+            .update_item()
+            .table_name(&self.table_name)
+            .key(key_field, AttributeValue::S(key.to_string()))
+            .update_expression(&update_expression)
+            .condition_expression(condition_expression)
+            .set_expression_attribute_names(Some(names))
+            .set_expression_attribute_values(Some(values))
+            .send()
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(e) => Err(DynamoException::DynamoIncrementException(format!("{e:?}"))),
+        }
     }
 
     fn encode_bookmark(&self, bookmark: Option<HashMap<String, AttributeValue>>) -> Option<String> {
@@ -650,41 +687,38 @@ mod dyanomdb_tests {
     async fn test_find() {
         let client = new_cli();
 
-        // NOTE: below code is commented out because it's not necessary for the test
-        //       It is just for insertion at the first time.
-        // let key_prefix = "test_find";
-        // let ts = chrono::Utc::now().timestamp_nanos_opt();
-        // let ts = ts.unwrap();
-        // assert!(ts.is_some(), "timestamp is none");
-        // for i in 0..10 {
-        //     let result = client
-        //         .create(
-        //             IndexModel {
-        //                 key: format!("{key_prefix}_key-{ts}_{i}"),
-        //                 id: format!("{key_prefix}_id-{ts}_{i}"),
-        //                 created_at: ts,
-        //                 r#type: "type1".to_string(),
-        //             },
-        //         )
-        //         .await;
+        let key_prefix = "test_find";
+        let ts = chrono::Utc::now().timestamp_nanos_opt();
+        assert!(ts.is_some(), "timestamp is none");
+        let ts = ts.unwrap();
 
-        //     assert!(result.is_ok(), "{result:?}");
-        // }
+        for i in 0..10 {
+            let result = client
+                .create(IndexModel {
+                    key: format!("{key_prefix}_key-{ts}_{i}"),
+                    id: format!("{key_prefix}_id-{ts}_{i}"),
+                    created_at: ts,
+                    r#type: "type1".to_string(),
+                })
+                .await;
 
-        // for i in 0..10 {
-        //     let result = client
-        //         .create(
-        //             IndexModel {
-        //                 key: format!("{key_prefix}_key-{ts}_{i}_2"),
-        //                 id: format!("{key_prefix}_id-{ts}_{i}_2"),
-        //                 created_at: ts,
-        //                 r#type: "type2".to_string(),
-        //             },
-        //         )
-        //         .await;
+            assert!(result.is_ok(), "{result:?}");
+        }
 
-        //     assert!(result.is_ok(), "{result:?}");
-        // }
+        for i in 0..10 {
+            let result = client
+                .create(IndexModel {
+                    key: format!("{key_prefix}_key-{ts}_{i}_2"),
+                    id: format!("{key_prefix}_id-{ts}_{i}_2"),
+                    created_at: ts,
+                    r#type: "type2".to_string(),
+                })
+                .await;
+
+            assert!(result.is_ok(), "{result:?}");
+        }
+
+        thread::sleep(std::time::Duration::from_millis(100));
 
         let result = client
             .find("type-index", None, Some(6), vec![("type", "type1")])
@@ -742,5 +776,45 @@ mod dyanomdb_tests {
         thread::sleep(std::time::Duration::from_millis(100));
         let doc = client.get::<TestModel>(&key).await;
         assert!(matches!(doc, Ok(None)), "{doc:?}");
+    }
+
+    #[tokio::test]
+    async fn test_increment() {
+        let client = new_cli();
+        let ts = chrono::Utc::now().timestamp_nanos_opt();
+        assert!(ts.is_some(), "timestamp is none");
+        let ts = ts.unwrap();
+
+        let result = client
+            .create(TestModel {
+                key: format!("test_increment_key-{ts}"),
+                id: format!("test_increment_id-{ts}"),
+                created_at: ts,
+            })
+            .await;
+
+        assert!(result.is_ok(), "test_increment creation failed: {result:?}");
+        thread::sleep(std::time::Duration::from_millis(100));
+        let result = client
+            .increment(
+                (
+                    option_env!("AWS_DYNAMODB_KEY").unwrap_or("key"),
+                    &format!("test_increment_id-{ts}"),
+                ),
+                "created_at",
+                1,
+            )
+            .await;
+        assert!(result.is_ok(), "test_increment addition failed: {result:?}");
+
+        thread::sleep(std::time::Duration::from_millis(100));
+
+        let doc = client
+            .get::<TestModel>(&format!("test_increment_id-{ts}"))
+            .await;
+
+        assert!(matches!(doc, Ok(Some(_))), "{doc:?}");
+        let doc = doc.unwrap().unwrap();
+        assert!(doc.created_at == ts + 1, "{doc:?}");
     }
 }

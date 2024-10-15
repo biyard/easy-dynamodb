@@ -13,6 +13,7 @@ pub enum DynamoException {
     DynamoQueryException(String),
     DynamoGetItemException(String),
     DynamoDeleteItemException(String),
+    DynamoIncrementException(String),
 }
 
 impl std::fmt::Display for DynamoException {
