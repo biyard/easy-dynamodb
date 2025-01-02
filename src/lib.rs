@@ -13,6 +13,10 @@ use std::time::Duration;
 
 static mut CLI: Option<Client> = None;
 
+pub trait Document {
+    fn document_type() -> String;
+}
+
 pub fn init(
     logger: Logger,
     access_key_id: String,
@@ -39,7 +43,7 @@ pub fn init(
     }
 }
 
-pub fn get_client(logger: Logger) -> Client {
+pub fn get_client(logger: &Logger) -> Client {
     let mut cli = unsafe { CLI.clone().unwrap() };
     cli.log = logger.new(o!("crate" => "easy-dynamodb"));
     cli
